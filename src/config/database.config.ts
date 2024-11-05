@@ -17,7 +17,7 @@ export const getDatabaseConfig = (
     migrationsTableName: 'TypeOrmMeta',
     autoLoadEntities: true,
     migrationsRun: false,
-    synchronize: true,
+    synchronize: false,
     type: 'postgres',
   };
 };

@@ -6,11 +6,12 @@ import {
   VersioningType,
 } from '@nestjs/common';
 import { ValidationError } from 'class-validator';
-import * as dotenv from 'dotenv';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { AppModule } from './app.module';
 import { ValidationHelpers } from './common/helpers';
 import { RedisAdapter } from './adapters';
+import * as dotenv from 'dotenv'
+
 process.env.TZ = 'Etc/UTC';
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
@@ -28,6 +29,7 @@ async function bootstrap() {
     type: VersioningType.URI,
   });
   app.enableCors();
+  dotenv.config();
   app.useGlobalPipes(
     new ValidationPipe({
       exceptionFactory: (validationErrors: ValidationError[] = []) => {
