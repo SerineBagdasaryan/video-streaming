@@ -141,12 +141,13 @@ import {
 import { Server, Socket } from 'socket.io';
 import { join } from 'path';
 import { createWriteStream, existsSync, mkdirSync, WriteStream } from 'fs';
-import { Inject, CACHE_MANAGER } from '@nestjs/common';
+import { Inject, CACHE_MANAGER, UseGuards } from '@nestjs/common';
 import { Cache } from '@nestjs/cache-manager';
 import { MediaTypes } from 'src/common/enum';
 import { generateUniqueFileName } from 'src/common/helpers';
 import { ConfigService } from '@nestjs/config';
 import { MediaStreamService } from 'src/modules';
+import { WsGuard } from 'src/common/guards';
 
 @WebSocketGateway({
   transports: ['websocket', 'polling'],
@@ -154,6 +155,7 @@ import { MediaStreamService } from 'src/modules';
     origin: '*',
   },
 })
+@UseGuards(WsGuard)
 export class SocketIoGateway
     implements OnGatewayInit, OnGatewayConnection, OnGatewayDisconnect
 {
@@ -195,7 +197,7 @@ export class SocketIoGateway
       const host = this.configService.get<string>('HOST') || 'localhost';
       const port = this.configService.get<number>('PORT') || 3000;
       const videoUrl = `http://${host}:${port}/uploads/${fileName}`;
-      await this.mediaStreamService.saveMedia(userId, type, videoUrl);
+      await this.mediaStreamService.create(userId, type, videoUrl);
     }
     const stream = createWriteStream(filePath, { flags: 'a' });
     stream.on('error', async (err) => {
@@ -205,7 +207,7 @@ export class SocketIoGateway
 
     stream.on('close', async () => {
       console.log(`Stream closed for ${type} (userId: ${userId})`);
-      await this.cacheManager.del(streamKey); // Remove path from cache if the stream closes
+      await this.cacheManager.del(streamKey);
     });
 
     return stream;

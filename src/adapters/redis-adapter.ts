@@ -25,7 +25,7 @@ export class RedisAdapter extends IoAdapter {
     server.adapter(this.adapterConstructor);
 
     server.use((socket, next) => {
-      const token = socket.handshake.query.token;
+        const token = socket.handshake.query.token;
       if (!token) {
         return next(new Error(ERROR_MESSAGES.UNAUTHORIZED));
       }

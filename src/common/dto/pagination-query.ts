@@ -1,7 +1,9 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { IsNumber, IsOptional } from 'class-validator';
+import { IPaginationQuery } from '../models';
 
-export class BaseQueryDto {
+
+export class PaginationQueryDTO implements IPaginationQuery {
   @ApiProperty({
     type: Number,
     default: 10,
