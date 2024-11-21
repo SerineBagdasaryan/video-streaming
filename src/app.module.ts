@@ -9,8 +9,9 @@ import { ServeStaticModule } from '@nestjs/serve-static';
 import { redisStore } from 'cache-manager-redis-yet';
 import { CacheModule } from '@nestjs/cache-manager';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { getDatabaseConfig } from "./config/database.config";
+import { getDatabaseConfig } from './config/database.config';
 import { MediaStreamModule, UsersModule } from './modules';
+import { join } from 'path';
 
 @Module({
   imports: [
@@ -21,7 +22,7 @@ import { MediaStreamModule, UsersModule } from './modules';
     }),
     ServeStaticModule.forRoot({
       serveRoot: '/uploads',
-      rootPath: 'uploads',
+      rootPath: join(process.cwd(), 'uploads'),
     }),
     UsersModule,
     SocketIoModule,

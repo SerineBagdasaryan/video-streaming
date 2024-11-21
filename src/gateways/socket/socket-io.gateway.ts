@@ -184,6 +184,7 @@ export class SocketIoGateway
     const userId: number = client['userId'];
     await this.closeStream(userId, MediaTypes.camera);
     await this.closeStream(userId, MediaTypes.screen);
+    client.disconnect();
   }
 
   private async getOrCreateStream(userId: number, type: MediaTypes): Promise<WriteStream | null> {
