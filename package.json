@@ -39,6 +39,7 @@
     "@socket.io/redis-adapter": "^8.3.0",
     "@types/cache-manager-redis-store": "^2.0.4",
     "@types/jsonwebtoken": "^9.0.7",
+    "@types/lodash": "^4.17.13",
     "@types/socket.io": "^3.0.1",
     "cache-manager": "^4.0.0",
     "cache-manager-redis-store": "^3.0.1",

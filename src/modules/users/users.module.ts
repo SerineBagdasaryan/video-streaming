@@ -4,9 +4,11 @@ import { UsersService } from './users.service';
 import { UsersController } from './users.controller';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { JwtModule } from '@nestjs/jwt';
+import { OrganizationModule } from '../organization';
 
 @Module({
   imports: [
+    OrganizationModule,
     JwtModule.registerAsync({
       useFactory: (configService: ConfigService) => ({
         signOptions: { expiresIn: configService.get('JWT_SECRET') },

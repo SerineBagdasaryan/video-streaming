@@ -10,7 +10,7 @@ import { redisStore } from 'cache-manager-redis-yet';
 import { CacheModule } from '@nestjs/cache-manager';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { getDatabaseConfig } from './config/database.config';
-import { MediaStreamModule, UsersModule } from './modules';
+import { MediaStreamModule, UsersModule, OrganizationModule } from './modules';
 import { join } from 'path';
 
 @Module({
@@ -47,6 +47,7 @@ import { join } from 'path';
       inject: [ConfigService],
     }),
     MediaStreamModule,
+    OrganizationModule,
   ],
   controllers: [AppController],
   providers: [AppService],

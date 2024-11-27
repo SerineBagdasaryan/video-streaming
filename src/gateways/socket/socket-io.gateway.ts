@@ -129,7 +129,6 @@
 //   }
 // }
 
-
 import {
   WebSocketGateway,
   SubscribeMessage,
@@ -141,23 +140,30 @@ import {
 import { Server, Socket } from 'socket.io';
 import { join } from 'path';
 import { createWriteStream, existsSync, mkdirSync, WriteStream } from 'fs';
-import { Inject, CACHE_MANAGER, UseGuards } from '@nestjs/common';
+import {
+  Inject,
+  CACHE_MANAGER,
+  UseGuards,
+  NotFoundException,
+} from '@nestjs/common';
 import { Cache } from '@nestjs/cache-manager';
 import { MediaTypes } from 'src/common/enum';
 import { generateUniqueFileName } from 'src/common/helpers';
 import { ConfigService } from '@nestjs/config';
-import { MediaStreamService } from 'src/modules';
+import { MediaStreamService, OrganizationService } from "src/modules";
 import { WsGuard } from 'src/common/guards';
+import { CreateMediaStreamDTO } from '../../common/dto';
+import { ERROR_MESSAGES } from '../../common/messages';
 
 @WebSocketGateway({
-  transports: ['websocket', 'polling'],
+  transports: ['websocket'],
   cors: {
     origin: '*',
   },
 })
 @UseGuards(WsGuard)
 export class SocketIoGateway
-    implements OnGatewayInit, OnGatewayConnection, OnGatewayDisconnect
+  implements OnGatewayInit, OnGatewayConnection, OnGatewayDisconnect
 {
   @WebSocketServer()
   server: Server;
@@ -165,19 +171,28 @@ export class SocketIoGateway
   private uploadsDir = join(process.cwd(), 'uploads');
 
   constructor(
-      @Inject(CACHE_MANAGER) private cacheManager: Cache,
-      private readonly configService: ConfigService,
-      private readonly mediaStreamService: MediaStreamService
+    @Inject(CACHE_MANAGER) private cacheManager: Cache,
+    private readonly configService: ConfigService,
+    private readonly mediaStreamService: MediaStreamService,
+    private readonly organizationService: OrganizationService,
   ) {}
 
   afterInit() {
     console.log('WebSocket initialized');
   }
 
-  async handleConnection(_socket: Socket): Promise<void> {
+  async handleConnection(socket: Socket): Promise<void> {
     if (!existsSync(this.uploadsDir)) {
       mkdirSync(this.uploadsDir, { recursive: true });
     }
+    const organization = await this.organizationService.findOne({
+      apiKey: socket['apiKey'],
+    });
+
+    if (!organization) {
+      new NotFoundException(ERROR_MESSAGES.USER_API_KEY_NOT_EXISTS);
+    }
+    socket['organization'] = organization;
   }
 
   async handleDisconnect(client: Socket) {
@@ -186,23 +201,42 @@ export class SocketIoGateway
     await this.closeStream(userId, MediaTypes.screen);
     client.disconnect();
   }
+  private async getOrCreateStream(
+    userId: number,
+    type: MediaTypes,
+    client: Socket,
+  ): Promise<WriteStream | null> {
+    const orgDir = join(this.uploadsDir, client?.['organization']?.name);
 
-  private async getOrCreateStream(userId: number, type: MediaTypes): Promise<WriteStream | null> {
-    const streamKey = `${userId}-${type}-path`;
+    if (!existsSync(orgDir)) {
+      mkdirSync(orgDir, { recursive: true });
+    }
+
+    const streamKey = `${userId}-${type}`;
     let filePath = await this.cacheManager.get<string>(streamKey);
 
     if (!filePath) {
       const fileName = generateUniqueFileName(userId, type);
-      filePath = join(this.uploadsDir, fileName);
+      filePath = join(orgDir, fileName);
       await this.cacheManager.set(streamKey, filePath);
+
       const host = this.configService.get<string>('HOST') || 'localhost';
       const port = this.configService.get<number>('PORT') || 3000;
-      const videoUrl = `http://${host}:${port}/uploads/${fileName}`;
-      await this.mediaStreamService.create(userId, type, videoUrl);
+      const videoUrl = `http://${host}:${port}/uploads/${client['organization']?.name}/${fileName}`;
+      const data: CreateMediaStreamDTO = {
+        userId,
+        type,
+        filePath: videoUrl,
+        organization: client['organization'],
+      };
+      await this.mediaStreamService.create(data);
     }
+
     const stream = createWriteStream(filePath, { flags: 'a' });
     stream.on('error', async (err) => {
-      console.error(`Stream error for ${type} (userId: ${userId}): ${err.message}`);
+      console.error(
+        `Stream error for ${type} (userId: ${userId}): ${err.message}`,
+      );
       await this.closeStream(userId, type);
     });
 
@@ -216,12 +250,13 @@ export class SocketIoGateway
 
   @SubscribeMessage('video-stream')
   async handleVideoStream(
-      client: Socket,
-      data: { videoData: Buffer; type: MediaTypes },
+    client: Socket,
+    data: { videoData: Buffer; type: MediaTypes },
   ) {
+    console.log(client['organization']);
     const { videoData, type } = data;
     const userId: number = client['userId'];
-    const stream = await this.getOrCreateStream(userId, type);
+    const stream = await this.getOrCreateStream(userId, type, client);
 
     if (stream && stream.writable) {
       try {
@@ -233,15 +268,19 @@ export class SocketIoGateway
           }
         });
       } catch (error) {
-        console.error(`Failed to write video data to ${type} stream: ${error.message}`);
+        console.error(
+          `Failed to write video data to ${type} stream: ${error.message}`,
+        );
       }
     } else {
-      console.error(`Stream for type ${type} is not writable or couldn't be created.`);
+      console.error(
+        `Stream for type ${type} is not writable or couldn't be created.`,
+      );
     }
   }
 
   private async closeStream(userId: number, type: MediaTypes) {
-    const streamKey = `${userId}-${type}-path`;
+    const streamKey = `${userId}-${type}`;
     const filePath = await this.cacheManager.get<string>(streamKey);
 
     if (filePath) {
@@ -250,7 +289,9 @@ export class SocketIoGateway
       await this.cacheManager.del(streamKey);
       console.log(`Closed and removed stream for ${type} (userId: ${userId})`);
     } else {
-      console.error(`No active stream to close for userId: ${userId} and type: ${type}`);
+      console.error(
+        `No active stream to close for userId: ${userId} and type: ${type}`,
+      );
     }
   }
 }
